@@ -25,7 +25,7 @@ function initParticleCanvas() {
   const mouse = { x: -2000, y: -2000, isHovering: false, isDown: false, startX: 0, startY: 0 };
 
   const config = {
-    text: "Starren Media",
+    text: "Zonvia Agency",
     fontFamily: '"Inter", "Space Grotesk", sans-serif',
     fontWeight: "550",      // clean, elegant semi-medium weight (not overly heavy/bold)
     particleSize: 2.0,      // refined particle dot size
