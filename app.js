@@ -37,7 +37,11 @@ function initParticleCanvas() {
     color: '#121417'        // premium soft dark tone
   };
 
-  function resizeAndInitParticles() {
+  let isIntroAnimating = true;
+  let introStartTime = 0;
+  const INTRO_DURATION = 1800; // 1.8 seconds initial screen-wide convergence animation
+
+  function resizeAndInitParticles(isInitialLoad = false) {
     const rect = container.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -75,23 +79,46 @@ function initParticleCanvas() {
     const step = Math.max(2, Math.round(config.densityStep * dpr * 0.75));
     const invDpr = 1 / dpr;
 
+    // Window dimensions for the screen-wide scatter effect
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const canvasRect = canvas.getBoundingClientRect();
+
     for (let y = 0; y < canvas.height; y += step) {
       for (let x = 0; x < canvas.width; x += step) {
         const alpha = data[(y * canvas.width + x) * 4 + 3];
         if (alpha > 120) {
-          const posX = x * invDpr;
-          const posY = y * invDpr;
+          const targetX = x * invDpr;
+          const targetY = y * invDpr;
+
+          // On initial page load: start widely dispersed all across the window/screen
+          let startX = targetX;
+          let startY = targetY;
+
+          if (isInitialLoad) {
+            // Disperse across whole screen width & height relative to canvas coordinates
+            const screenX = (Math.random() - 0.5) * winW * 1.6 + (w / 2);
+            const screenY = (Math.random() - 0.5) * winH * 1.4 + (h / 2);
+            startX = screenX;
+            startY = screenY;
+          }
+
           particles.push({
-            x: posX,
-            y: posY,
-            baseX: posX,
-            baseY: posY,
-            vx: 0,
-            vy: 0,
+            x: startX,
+            y: startY,
+            baseX: targetX,
+            baseY: targetY,
+            vx: isInitialLoad ? (Math.random() - 0.5) * 8 : 0,
+            vy: isInitialLoad ? (Math.random() - 0.5) * 8 : 0,
             size: config.particleSize
           });
         }
       }
+    }
+
+    if (isInitialLoad) {
+      isIntroAnimating = true;
+      introStartTime = performance.now();
     }
 
     ctx.clearRect(0, 0, w, h);
@@ -108,7 +135,7 @@ function initParticleCanvas() {
     }
   }
 
-  function animate() {
+  function animate(currentTime) {
     if (!isInViewport) {
       isRunning = false;
       return;
@@ -122,10 +149,27 @@ function initParticleCanvas() {
 
     let totalMovement = 0;
 
+    // Handle intro convergence phase
+    let currentReturnSpeed = config.returnSpeed;
+    let currentFriction = config.friction;
+
+    if (isIntroAnimating) {
+      const elapsed = currentTime - introStartTime;
+      const progress = Math.min(1, elapsed / INTRO_DURATION);
+      
+      // Accelerate convergence as time progresses
+      currentReturnSpeed = 0.04 + progress * 0.05;
+      currentFriction = 0.88 + progress * 0.04;
+
+      if (progress >= 1) {
+        isIntroAnimating = false;
+      }
+    }
+
     for (let i = 0; i < particles.length; i++) {
       const p = particles[i];
 
-      // Mouse repulsion
+      // Mouse repulsion (preserved exactly as before)
       if (mouse.isHovering) {
         const dx = mouse.x - p.x;
         const dy = mouse.y - p.y;
@@ -139,27 +183,26 @@ function initParticleCanvas() {
         }
       }
 
-      // Spring back to base position
-      p.vx += (p.baseX - p.x) * config.returnSpeed;
-      p.vy += (p.baseY - p.y) * config.returnSpeed;
+      // Spring back to base position (converging to form text)
+      p.vx += (p.baseX - p.x) * currentReturnSpeed;
+      p.vy += (p.baseY - p.y) * currentReturnSpeed;
 
       // Friction damping
-      p.vx *= config.friction;
-      p.vy *= config.friction;
+      p.vx *= currentFriction;
+      p.vy *= currentFriction;
 
       p.x += p.vx;
       p.y += p.vy;
 
       totalMovement += Math.abs(p.vx) + Math.abs(p.vy) + Math.abs(p.baseX - p.x) + Math.abs(p.baseY - p.y);
 
-      // Draw particle (optimized square)
+      // Draw particle
       ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
     }
 
-    // Auto-Sleep: If particles have settled and mouse is not hovering, stop RAF loop to free CPU/GPU
-    if (!mouse.isHovering && totalMovement < 0.25) {
+    // Auto-Sleep: If intro is done, mouse is not hovering, and particles settled, sleep RAF loop
+    if (!isIntroAnimating && !mouse.isHovering && totalMovement < 0.25) {
       isRunning = false;
-      // Snap to exact resting positions once
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = config.color;
       for (let i = 0; i < particles.length; i++) {
@@ -241,8 +284,8 @@ function initParticleCanvas() {
     }, 150);
   });
 
-  // Initialize
-  resizeAndInitParticles();
+  // Initialize with initial screen-wide convergence animation
+  resizeAndInitParticles(true);
   wakeUpAnimation();
 }
 
