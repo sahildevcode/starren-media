@@ -602,3 +602,90 @@ window.handleFormSubmit = function(e) {
     success.style.display = 'block';
   }
 };
+
+/* ==========================================================================
+   6. Mouse-Move Interactive Thumbnail Trail Generator
+   ========================================================================== */
+function initThumbnailMouseTrail() {
+  const stage = document.getElementById('thumbnail-trail-stage');
+  const container = document.getElementById('trail-container');
+  if (!stage || !container) return;
+
+  // Real, high-CTR YouTube thumbnails provided by the user
+  const trailImages = [
+    'assets/real_thumbnails/real_thumb_1.jpg',
+    'assets/real_thumbnails/real_thumb_2.jpg',
+    'assets/real_thumbnails/real_thumb_3.jpg',
+    'assets/real_thumbnails/real_thumb_4.jpg',
+    'assets/real_thumbnails/real_thumb_5.jpg'
+  ];
+
+  let lastX = 0;
+  let lastY = 0;
+  let imgIndex = 0;
+  const MIN_DISTANCE = 160; // 160px gap taaki har image clear aur alag alag dikhe
+
+  function spawnCard(x, y) {
+    const card = document.createElement('div');
+    card.className = 'trail-thumb-card';
+    
+    // Position relative to stage container
+    card.style.left = `${x}px`;
+    card.style.top = `${y}px`;
+
+    // Random subtle tilt angle (-10deg to +10deg)
+    const rot = (Math.random() - 0.5) * 20;
+    card.style.setProperty('--rot', `${rot}deg`);
+
+    const img = document.createElement('img');
+    img.src = trailImages[imgIndex % trailImages.length];
+    img.alt = 'Thumbnail Showcase';
+    img.loading = 'eager';
+
+    card.appendChild(img);
+    container.appendChild(card);
+
+    imgIndex++;
+
+    // Remove element after animation ends (2.5 seconds total lifespan)
+    setTimeout(() => {
+      if (card && card.parentNode === container) {
+        container.removeChild(card);
+      }
+    }, 2500);
+  }
+
+  stage.addEventListener('mousemove', (e) => {
+    const rect = stage.getBoundingClientRect();
+    const curX = e.clientX - rect.left;
+    const curY = e.clientY - rect.top;
+
+    const dist = Math.hypot(curX - lastX, curY - lastY);
+    if (dist > MIN_DISTANCE) {
+      spawnCard(curX, curY);
+      lastX = curX;
+      lastY = curY;
+    }
+  }, { passive: true });
+
+  // Touch Support
+  stage.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 0) {
+      const rect = stage.getBoundingClientRect();
+      const curX = e.touches[0].clientX - rect.left;
+      const curY = e.touches[0].clientY - rect.top;
+
+      const dist = Math.hypot(curX - lastX, curY - lastY);
+      if (dist > MIN_DISTANCE) {
+        spawnCard(curX, curY);
+        lastX = curX;
+        lastY = curY;
+      }
+    }
+  }, { passive: true });
+}
+
+// Attach trail initializer to DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+  initThumbnailMouseTrail();
+});
